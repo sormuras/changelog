@@ -13,6 +13,9 @@ and this project adheres to [Calendar Versioning](https://calver.org/).
 ### Changed
 - Improve model [#2](https://github.com/sormuras/changelog/issues/2)
 
+### Removed
+- Unroll `Log` type into `render()` parameters [#2](https://github.com/sormuras/changelog/issues/2)
+
 ## [2024.01.25] - 2024-01-25
 
 ### Added

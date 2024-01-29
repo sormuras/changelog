@@ -14,37 +14,35 @@ import java.util.stream.Stream;
 /** Render the change log of this project to the standard output stream. */
 class ChangeLog {
   public static void main(String... args) {
-    System.out.print(render(log));
+    var log = render(unreleased.withPreviousRelease(release20240125), release20240125);
+    System.out.print(log);
   }
 
+  static String PREAMBLE =
+      """
+      # Changelog
+
+      All notable changes to this project will be documented in this file.
+
+      The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+      and this project adheres to [Calendar Versioning](https://calver.org/).
+      """;
+
   static Release unreleased =
-      Release.of("Unreleased", "HEAD")
+      Release.ofTitleAndTag("Unreleased", "HEAD")
           .with(Type.Changed, "Improve model", "2")
+          .with(Type.Removed, "Unroll `Log` type into `render()` parameters", "2")
           .with(Type.Added, "License under UPL-1.0");
 
   static Release release20240125 =
-      Release.of("2024.01.25", "2024.01.25")
+      Release.ofTitleAndTag("2024.01.25", "2024.01.25")
           .with(LocalDate.of(2024, 1, 25))
           .with(Type.Added, "Initial release", "1");
-
-  static Log log =
-      new Log(
-          "Changelog",
-          """
-          All notable changes to this project will be documented in this file.
-
-          The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-          and this project adheres to [Calendar Versioning](https://calver.org/).
-          """,
-          unreleased.withPreviousRelease(release20240125),
-          release20240125);
 
   static String HOME = "https://github.com/sormuras/changelog";
   static BinaryOperator<String> COMPARE_LINKER = (HOME + "/compare/%s...%s")::formatted;
   static UnaryOperator<String> ISSUE_LINKER = (HOME + "/issues/%s")::formatted;
   static UnaryOperator<String> TAG_LINKER = (HOME + "/releases/tag/%s")::formatted;
-
-  record Log(String title, String description, Release... releases) {}
 
   record Release(
       String title,
@@ -54,7 +52,7 @@ class ChangeLog {
       Optional<Release> previous,
       List<Entry> entries) {
 
-    static Release of(String title, String tag) {
+    static Release ofTitleAndTag(String title, String tag) {
       return new Release(title, Optional.empty(), LocalDate.MAX, tag, Optional.empty(), List.of());
     }
 
@@ -84,14 +82,10 @@ class ChangeLog {
     Security, // in case of vulnerabilities
   }
 
-  static String render(Log log) {
+  static String render(Release... releases) {
     var lines = new ArrayList<String>();
-    lines.add("# " + log.title());
-    if (!log.description().isBlank()) {
-      lines.add("");
-      log.description().lines().forEach(lines::add);
-    }
-    for (var release : log.releases()) {
+    PREAMBLE.lines().forEach(lines::add);
+    for (var release : releases) {
       lines.add("");
       if (release.date() == LocalDate.MAX) {
         lines.add("## [" + release.title() + "]");
@@ -124,9 +118,9 @@ class ChangeLog {
         }
       }
     }
-    if (log.releases().length > 0) {
+    if (releases.length > 0) {
       lines.add("");
-      for (var release : log.releases()) {
+      for (var release : releases) {
         var link =
             release.previous().isEmpty()
                 ? TAG_LINKER.apply(release.tag())
