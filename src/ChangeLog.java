@@ -1,14 +1,31 @@
+/*
+ * Copyright (c) 2024 Christian Stein
+ * Licensed under the Universal Permissive License v 1.0 -> https://opensource.org/license/upl
+ */
+
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 /** Render the change log of this project to the standard output stream. */
 class ChangeLog {
   public static void main(String... args) {
     System.out.print(render(log));
   }
+
+  static Release unreleased =
+      Release.of("Unreleased", "HEAD")
+          .with(Type.Changed, "Improve model", "2")
+          .with(Type.Added, "License under UPL-1.0");
+
+  static Release release20240125 =
+      Release.of("2024.01.25", "2024.01.25")
+          .with(LocalDate.of(2024, 1, 25))
+          .with(Type.Added, "Initial release", "1");
 
   static Log log =
       new Log(
@@ -19,24 +36,8 @@ class ChangeLog {
           The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
           and this project adheres to [Calendar Versioning](https://calver.org/).
           """,
-          new Release(
-              "Unreleased",
-              "_Nothing noteworthy, yet._",
-              LocalDate.MAX,
-              Tag.HEAD,
-              Tag.NAME_2024_01_25),
-          new Release(
-              Tag.NAME_2024_01_25,
-              "",
-              LocalDate.of(2024, 1, 25),
-              Tag.NAME_2024_01_25,
-              "",
-              new Entry(Type.Added, "Initial release", "1")));
-
-  interface Tag {
-    String HEAD = "HEAD";
-    String NAME_2024_01_25 = "2024.01.25";
-  }
+          unreleased.withPreviousRelease(release20240125),
+          release20240125);
 
   static String HOME = "https://github.com/sormuras/changelog";
   static BinaryOperator<String> COMPARE_LINKER = (HOME + "/compare/%s...%s")::formatted;
@@ -47,13 +48,32 @@ class ChangeLog {
 
   record Release(
       String title,
-      String description,
+      Optional<String> description,
       LocalDate date,
-      String releaseTag,
-      String previousTag,
-      Entry... entries) {}
+      String tag,
+      Optional<Release> previous,
+      List<Entry> entries) {
 
-  record Entry(Type type, String text, String... issues) {}
+    static Release of(String title, String tag) {
+      return new Release(title, Optional.empty(), LocalDate.MAX, tag, Optional.empty(), List.of());
+    }
+
+    Release with(Type type, String text, String... issues) {
+      var entry = new Entry(type, text, List.of(issues));
+      var entries = Stream.concat(entries().stream(), Stream.of(entry)).toList();
+      return new Release(title, description, date, tag, previous, entries);
+    }
+
+    Release with(LocalDate date) {
+      return new Release(title, description, date, tag, previous, entries);
+    }
+
+    Release withPreviousRelease(Release previous) {
+      return new Release(title, description, date, tag, Optional.ofNullable(previous), entries);
+    }
+  }
+
+  record Entry(Type type, String text, List<String> issues) {}
 
   enum Type {
     Added, // for new features
@@ -78,29 +98,28 @@ class ChangeLog {
       } else {
         lines.add("## [" + release.title() + "] - " + release.date());
       }
-      if (!release.description().isBlank()) {
+      if (release.description().isPresent()) {
         lines.add("");
-        release.description().lines().forEach(lines::add);
+        release.description().get().lines().forEach(lines::add);
       }
-      if (release.entries().length == 0) {
-        if (release.description().isBlank()) {
+      if (release.entries().isEmpty()) {
+        if (release.description().isEmpty()) {
           lines.add("");
           lines.add("_Nothing noteworthy, yet._");
         }
         continue;
       }
       for (var type : Type.values()) {
-        var entries =
-            Arrays.stream(release.entries()).filter(entry -> entry.type() == type).toList();
+        var entries = release.entries().stream().filter(entry -> entry.type() == type).toList();
         if (entries.isEmpty()) continue;
         lines.add("");
         lines.add("### " + type);
         for (var entry : entries) {
           var links =
-              Arrays.stream(entry.issues())
-                  .map(issue -> "[%s](%s)".formatted(issue, ISSUE_LINKER.apply(issue)))
+              entry.issues().stream()
+                  .map(issue -> "[#%s](%s)".formatted(issue, ISSUE_LINKER.apply(issue)))
                   .toList();
-          var issues = entry.issues().length == 0 ? "" : " " + String.join(" ", links);
+          var issues = entry.issues().isEmpty() ? "" : " " + String.join(" ", links);
           lines.add("- " + entry.text() + issues);
         }
       }
@@ -109,9 +128,9 @@ class ChangeLog {
       lines.add("");
       for (var release : log.releases()) {
         var link =
-            release.previousTag().isBlank()
-                ? TAG_LINKER.apply(release.releaseTag())
-                : COMPARE_LINKER.apply(release.previousTag(), release.releaseTag());
+            release.previous().isEmpty()
+                ? TAG_LINKER.apply(release.tag())
+                : COMPARE_LINKER.apply(release.previous().get().tag(), release.tag());
         lines.add("[" + release.title() + "]: " + link);
       }
     }
