@@ -7,7 +7,11 @@ and this project adheres to [Calendar Versioning](https://calver.org/).
 
 ## [Unreleased]
 
-_Nothing noteworthy, yet._
+### Added
+- License under UPL-1.0
+
+### Changed
+- Improve model [#2](https://github.com/sormuras/changelog/issues/2)
 
 ## [2024.01.25] - 2024-01-25
 
